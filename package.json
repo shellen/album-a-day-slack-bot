@@ -1,0 +1,31 @@
+{
+  "name": "album-of-the-day-slack-bot",
+  "version": "1.0.0",
+  "description": "GitHub Actions bot that posts daily albums from Album of the Day to Slack",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "slack",
+    "bot",
+    "music",
+    "album",
+    "github-actions",
+    "automation"
+  ],
+  "author": "Album of the Day Community",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/album-day/slack-bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/album-day/slack-bot/issues"
+  },
+  "homepage": "https://github.com/album-day/slack-bot#readme"
+}
