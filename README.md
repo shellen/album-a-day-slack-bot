@@ -36,11 +36,32 @@ Click the "Fork" button to create your own copy.
 
 ### 2. Create a Slack webhook
 
-1. Go to your Slack workspace settings
-2. Navigate to **Apps** → **Incoming Webhooks**
-3. Click **Add to Slack**
-4. Choose your target channel
-5. Copy the webhook URL
+**Option A: Use the manifest file (recommended)**
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps)
+2. Click **Create New App**
+3. Choose **From a manifest**
+4. Select your workspace
+5. Copy and paste the contents of [`slack-app-manifest.yaml`](slack-app-manifest.yaml) from this repo
+6. Click **Next** → **Create**
+7. In the left sidebar, click **Incoming Webhooks**
+8. Click **Add New Webhook to Workspace**
+9. Choose your target channel (e.g., `#music`)
+10. Click **Allow**
+11. Copy the webhook URL (starts with `https://hooks.slack.com/services/...`)
+
+**Option B: Manual setup**
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps)
+2. Click **Create New App** → **From scratch**
+3. Enter an app name (e.g., "Album Bot") and select your workspace
+4. Click **Create App**
+5. In the left sidebar, click **Incoming Webhooks**
+6. Toggle **Activate Incoming Webhooks** to **On**
+7. Click **Add New Webhook to Workspace**
+8. Choose your target channel (e.g., `#music`)
+9. Click **Allow**
+10. Copy the webhook URL (starts with `https://hooks.slack.com/services/...`)
 
 ### 3. Request API Key
 
@@ -50,17 +71,42 @@ For external access to the Album of the Day feed, you'll need an API key:
 
 ### 4. Configure GitHub Secrets
 
-In your forked repo, go to **Settings** → **Secrets and variables** → **Actions**:
+In your forked repository, you need to add your credentials as encrypted secrets:
 
-**Required:**
+1. **Navigate to your forked repo** on GitHub
+2. Click the **Settings** tab (at the top of your repo page)
+3. In the left sidebar, click **Secrets and variables** → **Actions**
+4. Click **New repository secret** for each of the following:
 
-- `SLACK_WEBHOOK_URL` - Your Slack webhook URL
-- `SLACK_CHANNEL` - Channel name (e.g., `#music`)
-- `ALBUM_API_KEY` - Your API key for accessing the feed (format: `aotd_xxxxxxxx...`)
+**Required secrets to add:**
 
-**Optional:**
+**`SLACK_WEBHOOK_URL`**
+- Click **New repository secret**
+- Name: `SLACK_WEBHOOK_URL`
+- Secret: Paste your Slack webhook URL (from step 2)
+- Click **Add secret**
 
-- `ALBUM_FEED_URL` - Custom feed URL (defaults to official site)
+**`SLACK_CHANNEL`**
+- Click **New repository secret**
+- Name: `SLACK_CHANNEL`
+- Secret: Your channel name (e.g., `#music` or `#general`)
+- Click **Add secret**
+
+**`ALBUM_API_KEY`**
+- Click **New repository secret**
+- Name: `ALBUM_API_KEY`
+- Secret: Your API key from **@shellen** (format: `aotd_xxxxxxxx...`)
+- Click **Add secret**
+
+**Optional secret:**
+
+**`ALBUM_FEED_URL`** (only if using a custom feed)
+- Click **New repository secret**
+- Name: `ALBUM_FEED_URL`
+- Secret: Custom feed URL
+- Click **Add secret**
+
+💡 **Tip**: Secrets are encrypted and only visible to GitHub Actions. You can always update them later in the same Settings → Secrets section.
 
 ### 5. Enable GitHub Actions
 
