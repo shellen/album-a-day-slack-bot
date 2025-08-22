@@ -289,6 +289,9 @@ async function main() {
       `🎵 Found album: "${album.album}" by ${album.artist} (${album.scheduledDate})`
     );
 
+    // Debug: Log the album data structure
+    console.log("🔍 Album data:", JSON.stringify(targetAlbum, null, 2));
+    
     // Format and send to Slack
     const slackMessage = formatAlbumMessage(targetAlbum);
 
