@@ -140,23 +140,41 @@ function formatAlbumMessage(albumItem) {
   // Build action buttons
   const buttons = [];
 
-  // Add streaming service buttons
-  if (albumItem.attachments) {
-    albumItem.attachments.forEach((attachment) => {
-      if (attachment.title && attachment.url) {
-        const serviceName = attachment.title.replace("Listen on ", "");
-        buttons.push({
-          type: "button",
-          text: {
-            type: "plain_text",
-            text: serviceName,
-            emoji: true,
-          },
-          url: attachment.url,
-        });
-      }
-    });
-  }
+  // Add streaming service buttons (generate URLs since API doesn't provide them)
+  const searchQuery = encodeURIComponent(`${album.artist} ${album.album}`);
+  
+  // Spotify
+  buttons.push({
+    type: "button",
+    text: {
+      type: "plain_text",
+      text: "Spotify",
+      emoji: true,
+    },
+    url: `https://open.spotify.com/search/${searchQuery}`,
+  });
+
+  // Apple Music
+  buttons.push({
+    type: "button",
+    text: {
+      type: "plain_text",
+      text: "Apple Music",
+      emoji: true,
+    },
+    url: `https://music.apple.com/search?term=${searchQuery}`,
+  });
+
+  // YouTube
+  buttons.push({
+    type: "button",
+    text: {
+      type: "plain_text",
+      text: "YouTube",
+      emoji: true,
+    },
+    url: `https://www.youtube.com/results?search_query=${searchQuery}`,
+  });
 
   // Add Wikipedia button (construct Wikipedia URL from artist and album)
   const wikipediaQuery = encodeURIComponent(
