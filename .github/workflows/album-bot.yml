@@ -2,10 +2,16 @@ name: Album of the Day Slack Bot
 
 on:
   schedule:
-    # Run at 6:15 AM PDT (UTC-7) - 13:15 UTC
-    - cron: "15 13 * * *"
-    # Run at 6:15 AM PST (UTC-8) - 14:15 UTC  
-    - cron: "15 14 * * *"
+    # Default: 6:15 AM Pacific Time (customize by editing these cron expressions)
+    # Current schedule runs at 13:15 UTC (6:15 AM PDT) and 14:15 UTC (6:15 AM PST)
+    # 
+    # CUSTOMIZE YOUR SCHEDULE:
+    # For 9:00 PM GMT (21:00 UTC): "0 21 * * *"
+    # For 8:00 AM EST (13:00 UTC): "0 13 * * *" 
+    # For 10:00 AM CET (9:00 UTC): "0 9 * * *"
+    # Use https://crontab.guru to generate custom times
+    - cron: "15 13 * * *"  # 6:15 AM PDT (UTC-7)
+    - cron: "15 14 * * *"  # 6:15 AM PST (UTC-8)
   workflow_dispatch:
     inputs:
       date:
@@ -24,7 +30,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
         
     - name: Install dependencies

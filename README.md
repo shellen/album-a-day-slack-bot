@@ -13,7 +13,7 @@ This bot fetches the daily album from the Album of the Day JSON feed and posts i
 - **Clean, minimal design**
 - **Large album artwork**
 - **Action buttons** for Spotify, Apple Music, YouTube, and Wikipedia
-- **Automatic daily posting** at 6:15 AM Pacific
+- **Automatic daily posting** at your preferred time (customizable)
 
 ## 📱 Example Output
 
@@ -46,7 +46,7 @@ Click the "Fork" button to create your own copy.
 
 For external access to the Album of the Day feed, you'll need an API key:
 
-**⚠️ Note**: The admin interface is not yet ready for external API consumers. Stay tuned for updates, or email **jason@shellen.com** for API access in the meantime.
+**⚠️ Note**: The admin interface is not yet ready for external API consumers. Stay tuned for updates, or contact **@shellen** for API access in the meantime.
 
 ### 4. Configure GitHub Secrets
 
@@ -68,7 +68,7 @@ Go to the **Actions** tab and enable workflows. The bot will start posting autom
 
 ## ⏰ Schedule
 
-The bot runs at **6:15 AM Pacific Time** daily (15 minutes after new albums are available).
+By default, the bot runs at **6:15 AM Pacific Time** daily. You can easily customize this to any time that works for your timezone - see the **Customization** section below.
 
 ## 🛠️ Manual Control
 
@@ -102,13 +102,24 @@ SLACK_WEBHOOK_URL="your-webhook" npm start
 
 ### Change posting time
 
-Edit `.github/workflows/album-bot.yml`:
+Edit the `schedule` section in `.github/workflows/album-bot.yml`:
 
 ```yaml
 schedule:
-  - cron: "15 14 * * *" # 6:15 AM PDT (UTC-7)
-  - cron: "15 13 * * *" # 6:15 AM PST (UTC-8)
+  # Replace with your preferred time (all times in UTC)
+  # Examples:
+  - cron: "0 21 * * *"   # 9:00 PM GMT / 4:00 PM EST / 1:00 PM PST
+  - cron: "0 13 * * *"   # 8:00 AM EST / 5:00 AM PST  
+  - cron: "0 9 * * *"    # 10:00 AM CET / 4:00 AM EST
 ```
+
+**Tip:** Use [crontab.guru](https://crontab.guru) to generate cron expressions for your timezone.
+
+**Common times:**
+- **9:00 PM GMT**: `"0 21 * * *"`
+- **8:00 AM EST**: `"0 13 * * *"`
+- **10:00 AM CET**: `"0 9 * * *"`
+- **7:00 AM PST**: `"0 15 * * *"`
 
 ### Modify message format
 
@@ -124,10 +135,9 @@ This bot consumes the JSON Feed from Album of the Day:
 
 - **Endpoint**: `https://albumoftheday.netlify.app/api/feed/json`
 - **Format**: JSON Feed 1.1 standard
-- **Updates**: Every 6 hours with new albums
-- **Authentication**: Requires API key for external access (managed via Firebase admin interface)
+- **Updates**: Daily with new albums
+- **Authentication**: Requires API key for external access (contact **@shellen** for access)
 - **Rate Limiting**: 100 requests per hour per API key
-- **Key Management**: Create, view, and revoke API keys through the admin dashboard
 - **Key Format**: `aotd_` prefix followed by 32 random characters
 
 ## 🤝 Contributing
@@ -137,7 +147,10 @@ Contributions welcome! Please open an issue or PR for:
 - New streaming service integrations
 - Message format improvements
 - Additional notification platforms
+- Timezone/scheduling improvements
 - Bug fixes
+
+For questions or API access, contact **@shellen**.
 
 ## 📄 License
 
