@@ -46,11 +46,7 @@ Click the "Fork" button to create your own copy.
 
 For external access to the Album of the Day feed, you'll need an API key:
 
-1. Visit the [Album of the Day admin interface](https://albumoftheday.netlify.app/-/admin)
-2. Sign in with Google (you'll need to be granted admin access)
-3. Navigate to the **API Keys** tab
-4. Create a new API key with a descriptive name (e.g., "My Slack Bot")
-5. Copy the generated API key (format: `aotd_xxxxxxxx...`) - it will only be shown once!
+**⚠️ Note**: The admin interface is not yet ready for external API consumers. Stay tuned for updates, or email **jason@shellen.com** for API access in the meantime.
 
 ### 4. Configure GitHub Secrets
 

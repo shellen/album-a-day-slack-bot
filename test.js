@@ -23,7 +23,7 @@ const TARGET_DATE = process.env.TARGET_DATE;
 function httpsGet(url) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
-    const isHttps = urlObj.protocol === 'https:';
+    const isHttps = urlObj.protocol === "https:";
     const options = {
       hostname: urlObj.hostname,
       port: urlObj.port || (isHttps ? 443 : 80),
@@ -35,7 +35,10 @@ function httpsGet(url) {
     };
 
     // Add API key for Album of the Day feed requests
-    if (ALBUM_API_KEY && (url.includes("albumoftheday.netlify.app") || url.includes("localhost"))) {
+    if (
+      ALBUM_API_KEY &&
+      (url.includes("albumoftheday.netlify.app") || url.includes("localhost"))
+    ) {
       options.headers["X-API-Key"] = ALBUM_API_KEY;
     }
 
