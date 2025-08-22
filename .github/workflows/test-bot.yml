@@ -1,0 +1,33 @@
+name: Test Album Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Specific date to test (YYYY-MM-DD format, optional)'
+        required: false
+        type: string
+
+jobs:
+  test-album:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Test album formatting (no Slack posting)
+      env:
+        ALBUM_API_KEY: ${{ secrets.ALBUM_API_KEY }}
+        ALBUM_FEED_URL: ${{ secrets.ALBUM_FEED_URL }}
+        TARGET_DATE: ${{ inputs.date }}
+      run: npm test
