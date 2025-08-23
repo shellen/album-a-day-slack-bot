@@ -208,7 +208,7 @@ function formatAlbumMessage(albumItem) {
     ],
   };
 
-  // Add album artwork as a clickable image block that links to archive page
+  // Add album artwork as a large image block that links to archive page
   if (albumItem.image) {
     // Generate archive URL based on the album's scheduled date
     const archiveUrl = `https://albumoftheday.netlify.app/${album.scheduledDate.replace(
@@ -220,24 +220,13 @@ function formatAlbumMessage(albumItem) {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: " ",
+        text: `<${archiveUrl}|View on Album Archive>`,
       },
       accessory: {
         type: "image",
         image_url: albumItem.image,
         alt_text: `${album.album} by ${album.artist} album cover`,
       },
-    });
-
-    // Add a context block with clickable link to archive
-    message.blocks.push({
-      type: "context",
-      elements: [
-        {
-          type: "mrkdwn",
-          text: `<${archiveUrl}|View on Album Archive>`,
-        },
-      ],
     });
   }
 
@@ -315,8 +304,11 @@ async function main() {
       `🎵 Found album: "${album.album}" by ${album.artist} (${album.scheduledDate})`
     );
 
-    // Debug: Log the album data structure
+    // Debug: Log the album data structure and image info
     console.log("🔍 Album data:", JSON.stringify(targetAlbum, null, 2));
+    console.log("🖼️  Image field:", targetAlbum.image);
+    console.log("🖼️  Image URL:", targetAlbum.image_url);
+    console.log("🖼️  Content image:", targetAlbum.content_image);
 
     // Format and send to Slack
     const slackMessage = formatAlbumMessage(targetAlbum);
