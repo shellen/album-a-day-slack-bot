@@ -133,22 +133,21 @@ function formatAlbumMessage(albumItem) {
   const isToday = album.scheduledDate === today;
 
   // Create simple message text (matching 1001 Albums format)
-  const messageText = `${isToday ? "Today's" : "Featured"} album:\n*${
-    album.album
-  }* by *${album.artist}*${album.year ? ` (${album.year})` : ""}`;
+  const messageText = `🎧 ${isToday ? "Today's" : "Featured"} album:
+*${album.album}* by *${album.artist}*${album.year ? ` (${album.year})` : ""}`;
 
   // Build action buttons
   const buttons = [];
 
   // Add streaming service buttons (generate URLs since API doesn't provide them)
   const searchQuery = encodeURIComponent(`${album.artist} ${album.album}`);
-  
+
   // Spotify
   buttons.push({
     type: "button",
     text: {
       type: "plain_text",
-      text: "Spotify",
+      text: "🎵 Spotify",
       emoji: true,
     },
     url: `https://open.spotify.com/search/${searchQuery}`,
@@ -159,7 +158,7 @@ function formatAlbumMessage(albumItem) {
     type: "button",
     text: {
       type: "plain_text",
-      text: "Apple Music",
+      text: "📱 Apple Music",
       emoji: true,
     },
     url: `https://music.apple.com/search?term=${searchQuery}`,
@@ -170,7 +169,7 @@ function formatAlbumMessage(albumItem) {
     type: "button",
     text: {
       type: "plain_text",
-      text: "YouTube",
+      text: "▶️ YouTube",
       emoji: true,
     },
     url: `https://www.youtube.com/results?search_query=${searchQuery}`,
@@ -186,7 +185,7 @@ function formatAlbumMessage(albumItem) {
     type: "button",
     text: {
       type: "plain_text",
-      text: "Wikipedia",
+      text: "📖 Wikipedia",
       emoji: true,
     },
     url: wikipediaUrl,
@@ -200,21 +199,6 @@ function formatAlbumMessage(albumItem) {
     text: messageText,
     blocks: [
       {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: `Album of the Day APP • <!date^${Math.floor(
-              Date.now() / 1000
-            )}^{time}|${new Date().toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-              hour12: true,
-            })}>`,
-          },
-        ],
-      },
-      {
         type: "section",
         text: {
           type: "mrkdwn",
@@ -224,12 +208,36 @@ function formatAlbumMessage(albumItem) {
     ],
   };
 
-  // Add album artwork as a separate image block (prominent like 1001 Albums)
+  // Add album artwork as a clickable image block that links to archive page
   if (albumItem.image) {
+    // Generate archive URL based on the album's scheduled date
+    const archiveUrl = `https://albumoftheday.netlify.app/${album.scheduledDate.replace(
+      /-/g,
+      "/"
+    )}`;
+
     message.blocks.push({
-      type: "image",
-      image_url: albumItem.image,
-      alt_text: `${album.album} by ${album.artist} album cover`,
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: " ",
+      },
+      accessory: {
+        type: "image",
+        image_url: albumItem.image,
+        alt_text: `${album.album} by ${album.artist} album cover`,
+      },
+    });
+
+    // Add a context block with clickable link to archive
+    message.blocks.push({
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `<${archiveUrl}|View on Album Archive>`,
+        },
+      ],
     });
   }
 
@@ -309,7 +317,7 @@ async function main() {
 
     // Debug: Log the album data structure
     console.log("🔍 Album data:", JSON.stringify(targetAlbum, null, 2));
-    
+
     // Format and send to Slack
     const slackMessage = formatAlbumMessage(targetAlbum);
 

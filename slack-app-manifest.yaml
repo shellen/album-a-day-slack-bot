@@ -1,10 +1,10 @@
 display_information:
-  name: Album of the Day Bot
+  name: Album of the Day
   description: Daily album recommendations from Album of the Day
   background_color: "#1a1a1a"
 features:
   bot_user:
-    display_name: Album Bot
+    display_name: Album of the Day
     always_online: false
 oauth_config:
   scopes:
@@ -13,5 +13,4 @@ oauth_config:
 settings:
   org_deploy_enabled: false
   socket_mode_enabled: false
-  is_hosted: false
   token_rotation_enabled: false
