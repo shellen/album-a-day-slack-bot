@@ -216,17 +216,26 @@ function formatAlbumMessage(albumItem) {
       "/"
     )}`;
 
+    // Add full-width image block
     message.blocks.push({
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `<${archiveUrl}|View on Album Archive>`,
+      type: "image",
+      image_url: albumItem.image,
+      alt_text: `${album.album} by ${album.artist} album cover`,
+      title: {
+        type: "plain_text",
+        text: `${album.album} by ${album.artist}`,
       },
-      accessory: {
-        type: "image",
-        image_url: albumItem.image,
-        alt_text: `${album.album} by ${album.artist} album cover`,
-      },
+    });
+
+    // Add archive link as separate context block
+    message.blocks.push({
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `<${archiveUrl}|View on Album Archive>`,
+        },
+      ],
     });
   }
 
