@@ -2,16 +2,15 @@ name: Album of the Day Slack Bot
 
 on:
   schedule:
-    # Default: 6:15 AM Pacific Time (customize by editing these cron expressions)
-    # Current schedule runs at 13:15 UTC (6:15 AM PDT) and 14:15 UTC (6:15 AM PST)
+    # Runs at 14:15 UTC (2:15 PM UTC) daily
+    # This equals 6:15 AM PST (winter) and 7:15 AM PDT (summer)
     # 
     # CUSTOMIZE YOUR SCHEDULE:
     # For 9:00 PM GMT (21:00 UTC): "0 21 * * *"
     # For 8:00 AM EST (13:00 UTC): "0 13 * * *" 
     # For 10:00 AM CET (9:00 UTC): "0 9 * * *"
     # Use https://crontab.guru to generate custom times
-    - cron: "15 13 * * *"  # 6:15 AM PDT (UTC-7)
-    - cron: "15 14 * * *"  # 6:15 AM PST (UTC-8)
+    - cron: "15 14 * * *"  # 2:15 PM UTC (6:15 AM PST / 7:15 AM PDT)
   workflow_dispatch:
     inputs:
       date:
