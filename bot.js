@@ -21,7 +21,7 @@ const ALBUM_API_KEY = process.env.ALBUM_API_KEY; // Required for external access
 const TARGET_DATE = process.env.TARGET_DATE; // Optional: specific date to fetch
 
 // Utility function to make HTTP/HTTPS requests
-function httpsGet(url) {
+function httpsGet(url, additionalHeaders = {}) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const isHttps = urlObj.protocol === "https:";
@@ -32,6 +32,7 @@ function httpsGet(url) {
       method: "GET",
       headers: {
         "User-Agent": "Album-of-the-Day-Bot/1.0",
+        ...additionalHeaders,
       },
     };
 
@@ -126,8 +127,104 @@ function getPacificDateString(date = new Date()) {
   });
 }
 
-// Function to format the album for Slack (matching 1001 Albums style)
-function formatAlbumMessage(albumItem) {
+// Function to test if an image URL is accessible
+async function testImageUrl(imageUrl) {
+  return new Promise((resolve) => {
+    const urlObj = new URL(imageUrl);
+    const isHttps = urlObj.protocol === "https:";
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (isHttps ? 443 : 80),
+      path: urlObj.pathname + urlObj.search,
+      method: "HEAD",
+      timeout: 5000,
+      headers: {
+        "User-Agent": "Album-of-the-Day-Bot/1.0",
+      },
+    };
+
+    const requestModule = isHttps ? https : http;
+    const req = requestModule.request(options, (res) => {
+      resolve(res.statusCode >= 200 && res.statusCode < 300);
+    });
+
+    req.on("error", () => resolve(false));
+    req.on("timeout", () => {
+      req.destroy();
+      resolve(false);
+    });
+
+    req.end();
+  });
+}
+
+// Function to validate and optimize image URL for Slack mobile compatibility
+async function validateAndOptimizeImageUrl(imageUrl) {
+  if (!imageUrl) return null;
+
+  try {
+    const url = new URL(imageUrl);
+    
+    if (url.protocol !== 'https:') {
+      console.log(`⚠️  Converting HTTP to HTTPS for mobile compatibility: ${imageUrl}`);
+      url.protocol = 'https:';
+    }
+
+    if (url.hostname === 'coverartarchive.org') {
+      const optimizedUrl = url.toString().replace('-1200.jpg', '-500.jpg');
+      if (optimizedUrl !== url.toString()) {
+        console.log(`📱 Testing optimized Cover Art Archive image: ${optimizedUrl}`);
+        const isOptimizedAvailable = await testImageUrl(optimizedUrl);
+        if (isOptimizedAvailable) {
+          console.log(`✅ Using 500px version for mobile optimization`);
+          return optimizedUrl;
+        } else {
+          console.log(`⚠️  500px version not available, falling back to original`);
+          return url.toString();
+        }
+      }
+      return url.toString();
+    }
+
+    if (url.hostname === 'i.scdn.co') {
+      return url.toString();
+    }
+
+    if (url.hostname.includes('mzstatic.com') || url.hostname.includes('itunes.apple.com')) {
+      return url.toString();
+    }
+
+    console.log(`📱 Using image from domain: ${url.hostname}`);
+    return url.toString();
+  } catch (error) {
+    console.log(`⚠️  Invalid image URL: ${imageUrl}`);
+    return null;
+  }
+}
+
+// Function to get direct Wikipedia URL using our centralized API
+async function getTopWikipediaUrl(album, artist) {
+  try {
+    const baseUrl = ALBUM_FEED_URL.includes('localhost') 
+      ? 'http://localhost:3000' 
+      : 'https://albumoftheday.netlify.app';
+    
+    const wikipediaUrl = `${baseUrl}/api/wikipedia?album=${encodeURIComponent(album)}&artist=${encodeURIComponent(artist)}`;
+    
+    const response = await httpsGet(wikipediaUrl);
+    
+    if (response && response.url) {
+      return response.url;
+    }
+    return null;
+  } catch (error) {
+    console.log(`⚠️  Wikipedia API error: ${error.message}`);
+    return null;
+  }
+}
+
+// Function to format the album for Slack
+async function formatAlbumMessage(albumItem) {
   const album = albumItem._album;
   const today = getPacificDateString();
   const isToday = album.scheduledDate === today;
@@ -175,11 +272,18 @@ function formatAlbumMessage(albumItem) {
     url: `https://www.youtube.com/results?search_query=${searchQuery}`,
   });
 
-  // Add Wikipedia button (construct Wikipedia URL from artist and album)
-  const wikipediaQuery = encodeURIComponent(
-    `${album.album} ${album.artist} album`
-  );
-  const wikipediaUrl = `https://en.wikipedia.org/wiki/Special:Search?search=${wikipediaQuery}`;
+  // Add Wikipedia button using our centralized API
+  let wikipediaUrl = await getTopWikipediaUrl(album.album, album.artist);
+  
+  if (!wikipediaUrl) {
+    const fallbackQuery = encodeURIComponent(
+      `${album.album} ${album.artist} album`
+    );
+    wikipediaUrl = `https://en.wikipedia.org/wiki/Special:Search?search=${fallbackQuery}`;
+    console.log(`📖 Using Wikipedia search fallback: ${wikipediaUrl}`);
+  } else {
+    console.log(`📖 Found Wikipedia article: ${wikipediaUrl}`);
+  }
 
   buttons.push({
     type: "button",
@@ -209,17 +313,21 @@ function formatAlbumMessage(albumItem) {
   };
 
   // Add album artwork as a large image block that links to archive page
-  if (albumItem.image) {
+  const optimizedImageUrl = await validateAndOptimizeImageUrl(albumItem.image);
+  
+  if (optimizedImageUrl) {
     // Generate archive URL based on the album's scheduled date
     const archiveUrl = `https://albumoftheday.netlify.app/${album.scheduledDate.replace(
       /-/g,
       "/"
     )}`;
 
+    console.log(`🖼️  Using optimized image URL: ${optimizedImageUrl}`);
+
     // Add full-width image block
     message.blocks.push({
       type: "image",
-      image_url: albumItem.image,
+      image_url: optimizedImageUrl,
       alt_text: `${album.album} by ${album.artist} album cover`,
       title: {
         type: "plain_text",
@@ -233,9 +341,24 @@ function formatAlbumMessage(albumItem) {
       elements: [
         {
           type: "mrkdwn",
-          text: `<${archiveUrl}|View on Album Archive>`,
+          text: `<${archiveUrl}|View album on Album of the Day>`,
         },
       ],
+    });
+  } else {
+    const archiveUrl = `https://albumoftheday.netlify.app/${album.scheduledDate.replace(
+      /-/g,
+      "/"
+    )}`;
+    
+    console.log(`⚠️  No valid image URL available, adding text-only archive link`);
+    
+    message.blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `<${archiveUrl}|🎵 View "${album.album}" by ${album.artist} on Album Archive>`,
+      },
     });
   }
 
@@ -317,7 +440,7 @@ async function main() {
     console.log("🔍 Album data:", JSON.stringify(targetAlbum, null, 2));
 
     // Format and send to Slack
-    const slackMessage = formatAlbumMessage(targetAlbum);
+    const slackMessage = await formatAlbumMessage(targetAlbum);
 
     console.log(`📤 Posting to Slack channel: ${SLACK_CHANNEL}`);
     await postToSlack(SLACK_WEBHOOK_URL, slackMessage);
