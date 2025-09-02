@@ -329,10 +329,6 @@ async function formatAlbumMessage(albumItem) {
       type: "image",
       image_url: optimizedImageUrl,
       alt_text: `${album.album} by ${album.artist} album cover`,
-      title: {
-        type: "plain_text",
-        text: `${album.album} by ${album.artist}`,
-      },
     });
 
     // Add archive link as separate context block
