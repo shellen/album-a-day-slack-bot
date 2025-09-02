@@ -5,6 +5,7 @@
 [![GitHub Actions](https://img.shields.io/badge/GitHub-Actions-blue?logo=github-actions)](https://github.com/features/actions)
 [![Slack](https://img.shields.io/badge/Slack-Bot-4A154B?logo=slack)](https://slack.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Album of the Day Slack Bot](https://github.com/shellen/album-a-day-slack-bot/actions/workflows/album-bot.yml/badge.svg)](https://github.com/shellen/album-a-day-slack-bot/actions/workflows/album-bot.yml)
 
 ## 🎵 What it does
 
