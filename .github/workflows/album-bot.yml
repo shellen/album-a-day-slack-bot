@@ -1,4 +1,4 @@
-name: Album of the Day Bot (All Platforms)
+name: Album of the Day Slack Bot
 
 on:
   schedule:
@@ -28,16 +28,30 @@ on:
         - 'bluesky-only'
 
 jobs:
-  post-to-slack:
-    if: ${{ (inputs.platforms == 'both' || inputs.platforms == 'slack-only' || inputs.platforms == null) && vars.POST_TO_SLACK != 'false' }}
-    uses: ./.github/workflows/post-to-slack.yml
-    secrets: inherit
-    with:
-      date: ${{ inputs.date }}
-  
-  post-to-bluesky:
-    if: ${{ (inputs.platforms == 'both' || inputs.platforms == 'bluesky-only' || inputs.platforms == null) && secrets.POST_TO_BLUESKY == 'true' }}
-    uses: ./.github/workflows/post-to-bluesky.yml
-    secrets: inherit
-    with:
-      date: ${{ inputs.date }}
+  post-album:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Post album to selected platforms
+      env:
+        SLACK_WEBHOOK_URL: ${{ inputs.platforms == 'bluesky-only' && '' || secrets.SLACK_WEBHOOK_URL }}
+        SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+        ALBUM_API_KEY: ${{ secrets.ALBUM_API_KEY }}
+        ALBUM_FEED_URL: ${{ secrets.ALBUM_FEED_URL }}
+        TARGET_DATE: ${{ inputs.date }}
+        POST_TO_BLUESKY: ${{ inputs.platforms == 'slack-only' && 'false' || (inputs.platforms == 'bluesky-only' && 'true') || secrets.POST_TO_BLUESKY }}
+        BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+        BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
+      run: npm start

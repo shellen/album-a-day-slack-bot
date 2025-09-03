@@ -1,15 +1,15 @@
-name: Test Bluesky Formatting
+name: 🔄 Retry Bluesky Only
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       date:
-        description: 'Specific date to test (YYYY-MM-DD format, optional)'
+        description: 'Specific date to retry (YYYY-MM-DD format, optional)'
         required: false
         type: string
 
 jobs:
-  test-bluesky:
+  retry-bluesky:
     runs-on: ubuntu-latest
     
     steps:
@@ -25,9 +25,15 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
-    - name: Test Bluesky formatting (no posting)
+    - name: Post album to Bluesky only (retry)
       env:
+        # Disable Slack for Bluesky-only retry
+        SLACK_WEBHOOK_URL: ""
         ALBUM_API_KEY: ${{ secrets.ALBUM_API_KEY }}
         ALBUM_FEED_URL: ${{ secrets.ALBUM_FEED_URL }}
         TARGET_DATE: ${{ inputs.date }}
-      run: npm run test:bluesky
+        # Enable Bluesky posting with album artwork
+        POST_TO_BLUESKY: true
+        BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+        BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
+      run: npm start
