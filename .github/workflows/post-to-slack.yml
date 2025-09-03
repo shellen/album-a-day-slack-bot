@@ -7,12 +7,6 @@ on:
         description: 'Specific date to fetch (YYYY-MM-DD format, optional)'
         required: false
         type: string
-  workflow_dispatch:
-    inputs:
-      date:
-        description: 'Specific date to fetch (YYYY-MM-DD format, optional)'
-        required: false
-        type: string
 
 jobs:
   post-to-slack:

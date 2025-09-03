@@ -17,17 +17,26 @@ on:
         description: 'Specific date to fetch (YYYY-MM-DD format, optional)'
         required: false
         type: string
+      platforms:
+        description: 'Which platforms to post to'
+        required: false
+        default: 'both'
+        type: choice
+        options:
+        - 'both'
+        - 'slack-only'
+        - 'bluesky-only'
 
 jobs:
   post-to-slack:
-    if: ${{ vars.POST_TO_SLACK != 'false' }}
+    if: ${{ (inputs.platforms == 'both' || inputs.platforms == 'slack-only' || inputs.platforms == null) && vars.POST_TO_SLACK != 'false' }}
     uses: ./.github/workflows/post-to-slack.yml
     secrets: inherit
     with:
       date: ${{ inputs.date }}
   
   post-to-bluesky:
-    if: ${{ secrets.POST_TO_BLUESKY == 'true' }}
+    if: ${{ (inputs.platforms == 'both' || inputs.platforms == 'bluesky-only' || inputs.platforms == null) && secrets.POST_TO_BLUESKY == 'true' }}
     uses: ./.github/workflows/post-to-bluesky.yml
     secrets: inherit
     with:
