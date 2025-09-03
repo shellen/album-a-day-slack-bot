@@ -190,11 +190,12 @@ async function formatBlueskyPost(albumItem) {
   
   // Define content in priority order (highest to lowest)
   const baseContent = `${header}\n${albumInfo}`;
+  // Bluesky doesn't support markdown links - use plain URLs with emojis
   const links = [
-    `[Spotify](https://open.spotify.com/search/${searchQuery})`,
-    `[Apple](https://music.apple.com/search?term=${searchQuery})`,
-    `[YouTube](https://music.youtube.com/search?q=${searchQuery})`,
-    `[Wikipedia](${wikipediaUrl})`
+    `🎵 Spotify: https://open.spotify.com/search/${searchQuery}`,
+    `📱 Apple: https://music.apple.com/search?term=${searchQuery}`,
+    `▶️ YouTube: https://music.youtube.com/search?q=${searchQuery}`,
+    `📖 Wikipedia: ${wikipediaUrl}`
   ];
   
   // Try different combinations starting with everything, then remove lowest priority items
@@ -282,14 +283,16 @@ async function postToBluesky(albumItem) {
     let embed = null;
     if (albumItem.image) {
       try {
-        console.log('🖼️  Downloading album artwork...');
+        console.log(`🖼️  Downloading album artwork from: ${albumItem.image}`);
         const imageData = await downloadImage(albumItem.image);
         
         if (imageData) {
-          console.log(`📤 Uploading album artwork (${imageData.mimeType})...`);
+          console.log(`📤 Uploading album artwork (${imageData.mimeType}, ${imageData.buffer.length} bytes)...`);
           const uploadResult = await agent.uploadBlob(imageData.buffer, {
             encoding: imageData.mimeType
           });
+          
+          console.log(`📤 Upload result:`, JSON.stringify(uploadResult.data, null, 2));
           
           const album = albumItem._album;
           embed = {
@@ -301,11 +304,17 @@ async function postToBluesky(albumItem) {
           };
           
           console.log('✅ Album artwork uploaded successfully');
+          console.log('🖼️  Embed object:', JSON.stringify(embed, null, 2));
+        } else {
+          console.log('⚠️  Image download returned null');
         }
       } catch (imageError) {
-        console.log(`⚠️  Failed to add album artwork: ${imageError.message}`);
+        console.log(`❌ Failed to add album artwork: ${imageError.message}`);
+        console.log(`❌ Full error:`, imageError);
         // Continue without image - don't fail the entire post
       }
+    } else {
+      console.log('📷 No image URL provided in albumItem');
     }
     
     // Create final post with optional image embed
