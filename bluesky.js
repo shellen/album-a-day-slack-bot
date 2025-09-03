@@ -134,6 +134,12 @@ async function downloadImage(imageUrl) {
     
     return new Promise((resolve, reject) => {
       const req = requestModule.request(options, (res) => {
+        // Handle redirects (301, 302, 307, 308)
+        if (res.statusCode >= 301 && res.statusCode <= 308 && res.headers.location) {
+          console.log(`🔄 Following redirect to: ${res.headers.location}`);
+          return downloadImage(res.headers.location).then(resolve).catch(reject);
+        }
+        
         if (res.statusCode >= 200 && res.statusCode < 300) {
           const chunks = [];
           res.on("data", (chunk) => chunks.push(chunk));
@@ -159,6 +165,31 @@ async function downloadImage(imageUrl) {
     console.log(`⚠️  Error downloading image: ${error.message}`);
     return null;
   }
+}
+
+// Helper to create rich text with facets for links
+function createRichText(text, links) {
+  const facets = [];
+  
+  // Find each link in the text and create facets
+  links.forEach(({ label, url }) => {
+    const linkText = `[${label}]`;
+    const linkIndex = text.indexOf(linkText);
+    
+    if (linkIndex !== -1) {
+      // Convert character positions to byte positions
+      const textUpToLink = text.substring(0, linkIndex);
+      const byteStart = Buffer.byteLength(textUpToLink, 'utf8');
+      const byteEnd = byteStart + Buffer.byteLength(linkText, 'utf8');
+      
+      facets.push({
+        index: { byteStart, byteEnd },
+        features: [{ $type: 'app.bsky.richtext.facet#link', uri: url }]
+      });
+    }
+  });
+  
+  return { text: text, facets: facets.length > 0 ? facets : undefined };
 }
 
 // Function to create smart Bluesky post that fits character limit
@@ -190,12 +221,20 @@ async function formatBlueskyPost(albumItem) {
   
   // Define content in priority order (highest to lowest)
   const baseContent = `${header}\n${albumInfo}`;
-  // Bluesky doesn't support markdown links - use plain URLs with emojis
+  
+  // Create rich text links with facets for better formatting
+  const linkData = [
+    { label: "Spotify", url: `https://open.spotify.com/search/${searchQuery}` },
+    { label: "Apple", url: `https://music.apple.com/search?term=${searchQuery}` },
+    { label: "YouTube", url: `https://music.youtube.com/search?q=${searchQuery}` },
+    { label: "Wikipedia", url: wikipediaUrl }
+  ];
+  
   const links = [
-    `🎵 Spotify: https://open.spotify.com/search/${searchQuery}`,
-    `📱 Apple: https://music.apple.com/search?term=${searchQuery}`,
-    `▶️ YouTube: https://music.youtube.com/search?q=${searchQuery}`,
-    `📖 Wikipedia: ${wikipediaUrl}`
+    `🎵 [Spotify]`,
+    `📱 [Apple]`,
+    `▶️ [YouTube]`,
+    `📖 [Wikipedia]`
   ];
   
   // Try different combinations starting with everything, then remove lowest priority items
@@ -241,8 +280,19 @@ async function formatBlueskyPost(albumItem) {
     }
   }
 
+  // Create rich text with facets for the final post
+  const linksInPost = [];
+  linkData.forEach((linkInfo, index) => {
+    if (postText.includes(`[${linkInfo.label}]`)) {
+      linksInPost.push(linkInfo);
+    }
+  });
+  
+  const richText = createRichText(postText, linksInPost);
+  
   return {
-    text: postText,
+    text: richText.text,
+    facets: richText.facets,
     createdAt: new Date().toISOString()
   };
 }
@@ -317,10 +367,11 @@ async function postToBluesky(albumItem) {
       console.log('📷 No image URL provided in albumItem');
     }
     
-    // Create final post with optional image embed
+    // Create final post with optional image embed and rich text facets
     const finalPost = {
       text: postData.text,
       createdAt: postData.createdAt,
+      ...(postData.facets && { facets: postData.facets }),
       ...(embed && { embed })
     };
     
@@ -345,5 +396,6 @@ async function postToBluesky(albumItem) {
 module.exports = {
   postToBluesky,
   formatBlueskyPost,
-  createBlueskyAgent
+  createBlueskyAgent,
+  downloadImage
 };

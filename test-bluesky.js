@@ -157,6 +157,22 @@ async function runBlueskyTest() {
     console.log("==========================================");
     console.log(blueskyPost.text);
     
+    if (blueskyPost.facets && blueskyPost.facets.length > 0) {
+      console.log("\n🔗 Rich Text Facets (clickable links):");
+      console.log("======================================");
+      blueskyPost.facets.forEach((facet, index) => {
+        const startByte = facet.index.byteStart;
+        const endByte = facet.index.byteEnd;
+        // Extract text using proper byte slicing
+        const buffer = Buffer.from(blueskyPost.text, 'utf8');
+        const linkText = buffer.slice(startByte, endByte).toString('utf8');
+        const linkUrl = facet.features[0].uri;
+        console.log(`${index + 1}. Bytes ${startByte}-${endByte}: "${linkText}" → ${linkUrl}`);
+      });
+    } else {
+      console.log("\n⚠️  No rich text facets found - links will appear as plain text");
+    }
+    
 
     if (blueskyPost.text.length > 300) {
       console.log("\n⚠️  WARNING: Post exceeds Bluesky's 300 character limit!");
