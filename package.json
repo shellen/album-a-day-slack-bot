@@ -5,7 +5,8 @@
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
-    "test": "node test.js"
+    "test": "node test.js",
+    "test:bluesky": "node test-bluesky.js"
   },
   "keywords": [
     "slack",
@@ -27,5 +28,8 @@
   "bugs": {
     "url": "https://github.com/album-day/slack-bot/issues"
   },
-  "homepage": "https://github.com/album-day/slack-bot#readme"
+  "homepage": "https://github.com/album-day/slack-bot#readme",
+  "dependencies": {
+    "@atproto/api": "^0.13.0"
+  }
 }

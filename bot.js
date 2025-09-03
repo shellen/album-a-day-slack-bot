@@ -10,6 +10,7 @@
 const https = require("https");
 const http = require("http");
 const { URL } = require("url");
+const { postToBluesky } = require("./bluesky");
 
 // Configuration from environment variables
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL;
@@ -19,6 +20,7 @@ const ALBUM_FEED_URL =
   "https://albumoftheday.netlify.app/api/feed/json";
 const ALBUM_API_KEY = process.env.ALBUM_API_KEY; // Required for external access
 const TARGET_DATE = process.env.TARGET_DATE; // Optional: specific date to fetch
+const POST_TO_BLUESKY = process.env.POST_TO_BLUESKY === 'true'; // Optional: enable Bluesky posting
 
 // Utility function to make HTTP/HTTPS requests
 function httpsGet(url, additionalHeaders = {}) {
@@ -443,9 +445,25 @@ async function main() {
 
     console.log("✅ Successfully posted album to Slack!");
 
+    // Post to Bluesky if enabled
+    if (POST_TO_BLUESKY) {
+      try {
+        console.log("🦋 Bluesky posting enabled, attempting to post...");
+        await postToBluesky(targetAlbum);
+        console.log("✅ Successfully posted album to Bluesky!");
+      } catch (blueskyError) {
+        console.error("❌ Bluesky posting failed:", blueskyError.message);
+        console.log(`::warning title=Bluesky Failed::${blueskyError.message}`);
+        // Don't fail the entire process if Bluesky fails
+      }
+    } else {
+      console.log("🦋 Bluesky posting disabled (set POST_TO_BLUESKY=true to enable)");
+    }
+
     // Output for GitHub Actions
+    const platforms = POST_TO_BLUESKY ? `${SLACK_CHANNEL} and Bluesky` : SLACK_CHANNEL;
     console.log(
-      `::notice title=Album Posted::Posted "${album.album}" by ${album.artist} to ${SLACK_CHANNEL}`
+      `::notice title=Album Posted::Posted "${album.album}" by ${album.artist} to ${platforms}`
     );
   } catch (error) {
     console.error("❌ Error:", error.message);

@@ -1,6 +1,6 @@
 # Album of the Day Slack Bot
 
-🤖 A GitHub Actions bot that automatically posts daily albums from [Album of the Day](https://albumoftheday.netlify.app) to your Slack workspace.
+🤖 A GitHub Actions bot that automatically posts daily albums from [Album of the Day](https://albumoftheday.netlify.app) to your Slack workspace and optionally to Bluesky.
 
 [![GitHub Actions](https://img.shields.io/badge/GitHub-Actions-blue?logo=github-actions)](https://github.com/features/actions)
 [![Slack](https://img.shields.io/badge/Slack-Bot-4A154B?logo=slack)](https://slack.com)
@@ -9,7 +9,7 @@
 
 ## 🎵 What it does
 
-This bot fetches the daily album from the Album of the Day JSON feed and posts it to your Slack channel with:
+This bot fetches the daily album from the Album of the Day JSON feed and posts it to your Slack channel and optionally to Bluesky with:
 
 - **Clean, minimal design**
 - **Large album artwork**
@@ -107,6 +107,30 @@ In your forked repository, you need to add your credentials as encrypted secrets
 - Secret: Custom feed URL
 - Click **Add secret**
 
+### Bluesky Integration (Optional)
+
+To enable posting to Bluesky in addition to Slack, add these optional secrets:
+
+**`POST_TO_BLUESKY`**
+- Click **New repository secret**
+- Name: `POST_TO_BLUESKY`
+- Secret: `true` (set to `true` to enable, omit or set to `false` to disable)
+- Click **Add secret**
+
+**`BLUESKY_HANDLE`**
+- Click **New repository secret**
+- Name: `BLUESKY_HANDLE`
+- Secret: Your Bluesky handle (e.g., `yourname.bsky.social`)
+- Click **Add secret**
+
+**`BLUESKY_PASSWORD`**
+- Click **New repository secret**
+- Name: `BLUESKY_PASSWORD`
+- Secret: Your Bluesky App Password (generate one at https://bsky.app/settings/app-passwords)
+- Click **Add secret**
+
+⚠️ **Important**: Use an App Password, not your main account password. Generate one in your Bluesky settings under "App Passwords".
+
 💡 **Tip**: Secrets are encrypted and only visible to GitHub Actions. You can always update them later in the same Settings → Secrets section.
 
 ### 5. Enable GitHub Actions
@@ -138,11 +162,17 @@ By default, the bot runs at **6:15 AM Pacific Time** daily. You can easily custo
 git clone https://github.com/YOUR-USERNAME/album-of-the-day-slack-bot.git
 cd album-of-the-day-slack-bot
 
-# Test bot formatting
+# Test bot formatting (Slack)
 npm run test
+
+# Test Bluesky post formatting
+npm run test:bluesky
 
 # Test with real webhook (optional)
 SLACK_WEBHOOK_URL="your-webhook" npm start
+
+# Test with Bluesky enabled (optional)
+SLACK_WEBHOOK_URL="your-webhook" POST_TO_BLUESKY=true BLUESKY_HANDLE="your.handle" BLUESKY_PASSWORD="your-app-password" npm start
 ```
 
 ## ⚙️ Customization
