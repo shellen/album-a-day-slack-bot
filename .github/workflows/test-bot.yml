@@ -1,4 +1,4 @@
-name: Test Album Bot
+name: Test Album Bot (All Platforms)
 
 on:
   workflow_dispatch:
@@ -9,32 +9,14 @@ on:
         type: string
 
 jobs:
-  test-album:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Test album formatting (no posting)
-      env:
-        ALBUM_API_KEY: ${{ secrets.ALBUM_API_KEY }}
-        ALBUM_FEED_URL: ${{ secrets.ALBUM_FEED_URL }}
-        TARGET_DATE: ${{ inputs.date }}
-      run: npm test
-      
-    - name: Test Bluesky formatting (no posting)
-      env:
-        ALBUM_API_KEY: ${{ secrets.ALBUM_API_KEY }}
-        ALBUM_FEED_URL: ${{ secrets.ALBUM_FEED_URL }}
-        TARGET_DATE: ${{ inputs.date }}
-      run: npm run test:bluesky
+  test-slack:
+    uses: ./.github/workflows/test-slack.yml
+    secrets: inherit
+    with:
+      date: ${{ inputs.date }}
+  
+  test-bluesky:
+    uses: ./.github/workflows/test-bluesky.yml
+    secrets: inherit
+    with:
+      date: ${{ inputs.date }}

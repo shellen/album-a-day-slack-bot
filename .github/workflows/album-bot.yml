@@ -1,4 +1,4 @@
-name: Album of the Day Slack Bot
+name: Album of the Day Bot (All Platforms)
 
 on:
   schedule:
@@ -19,31 +19,16 @@ on:
         type: string
 
 jobs:
-  post-album:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Post album to Slack and Bluesky
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
-        ALBUM_API_KEY: ${{ secrets.ALBUM_API_KEY }}
-        ALBUM_FEED_URL: ${{ secrets.ALBUM_FEED_URL }}
-        TARGET_DATE: ${{ inputs.date }}
-        # Bluesky integration (optional)
-        POST_TO_BLUESKY: ${{ secrets.POST_TO_BLUESKY }}
-        BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
-        BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
-      run: npm start
+  post-to-slack:
+    if: ${{ vars.POST_TO_SLACK != 'false' }}
+    uses: ./.github/workflows/post-to-slack.yml
+    secrets: inherit
+    with:
+      date: ${{ inputs.date }}
+  
+  post-to-bluesky:
+    if: ${{ secrets.POST_TO_BLUESKY == 'true' }}
+    uses: ./.github/workflows/post-to-bluesky.yml
+    secrets: inherit
+    with:
+      date: ${{ inputs.date }}

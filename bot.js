@@ -376,8 +376,9 @@ async function main() {
   try {
     console.log("🤖 Album of the Day Slack Bot starting...");
 
-    if (!SLACK_WEBHOOK_URL) {
-      throw new Error("SLACK_WEBHOOK_URL environment variable is required");
+    // Check if at least one posting method is configured
+    if (!SLACK_WEBHOOK_URL && !POST_TO_BLUESKY) {
+      throw new Error("Either SLACK_WEBHOOK_URL or POST_TO_BLUESKY must be configured");
     }
 
     if (!ALBUM_API_KEY) {
@@ -437,13 +438,17 @@ async function main() {
     // Debug: Log the album data structure
     console.log("🔍 Album data:", JSON.stringify(targetAlbum, null, 2));
 
-    // Format and send to Slack
-    const slackMessage = await formatAlbumMessage(targetAlbum);
+    // Post to Slack if configured
+    if (SLACK_WEBHOOK_URL) {
+      const slackMessage = await formatAlbumMessage(targetAlbum);
 
-    console.log(`📤 Posting to Slack channel: ${SLACK_CHANNEL}`);
-    await postToSlack(SLACK_WEBHOOK_URL, slackMessage);
+      console.log(`📤 Posting to Slack channel: ${SLACK_CHANNEL}`);
+      await postToSlack(SLACK_WEBHOOK_URL, slackMessage);
 
-    console.log("✅ Successfully posted album to Slack!");
+      console.log("✅ Successfully posted album to Slack!");
+    } else {
+      console.log("⏭️  Slack posting disabled (no webhook URL provided)");
+    }
 
     // Post to Bluesky if enabled
     if (POST_TO_BLUESKY) {
@@ -461,9 +466,12 @@ async function main() {
     }
 
     // Output for GitHub Actions
-    const platforms = POST_TO_BLUESKY ? `${SLACK_CHANNEL} and Bluesky` : SLACK_CHANNEL;
+    const platforms = [];
+    if (SLACK_WEBHOOK_URL) platforms.push(SLACK_CHANNEL);
+    if (POST_TO_BLUESKY) platforms.push("Bluesky");
+    
     console.log(
-      `::notice title=Album Posted::Posted "${album.album}" by ${album.artist} to ${platforms}`
+      `::notice title=Album Posted::Posted "${album.album}" by ${album.artist} to ${platforms.join(" and ")}`
     );
   } catch (error) {
     console.error("❌ Error:", error.message);
