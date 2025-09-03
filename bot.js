@@ -488,4 +488,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, formatAlbumMessage, getPacificDateString };
+module.exports = { main, formatAlbumMessage, getPacificDateString, getTopWikipediaUrl };

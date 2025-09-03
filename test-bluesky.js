@@ -92,9 +92,9 @@ async function runBlueskyTest() {
       var feed = {
         items: [{
           _album: {
-            album: "OK Computer",
-            artist: "Radiohead", 
-            year: 1997,
+            album: "The Dark Side of the Moon",
+            artist: "Pink Floyd", 
+            year: 1973,
             scheduledDate: new Date().toLocaleDateString('en-CA', {
               timeZone: 'America/Los_Angeles'
             })
@@ -146,7 +146,7 @@ async function runBlueskyTest() {
     );
 
     // Format the Bluesky post
-    const blueskyPost = formatBlueskyPost(targetAlbum);
+    const blueskyPost = await formatBlueskyPost(targetAlbum);
 
     console.log("\n📝 Formatted Bluesky Post:");
     console.log("==========================");

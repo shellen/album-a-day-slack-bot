@@ -7,10 +7,88 @@
  */
 
 const { BskyAgent } = require('@atproto/api');
+const https = require("https");
+const http = require("http");
+const { URL } = require("url");
 
 // Configuration from environment variables
 const BLUESKY_HANDLE = process.env.BLUESKY_HANDLE;
 const BLUESKY_PASSWORD = process.env.BLUESKY_PASSWORD; // App Password
+const ALBUM_FEED_URL = process.env.ALBUM_FEED_URL || "https://albumoftheday.netlify.app/api/feed/json";
+const ALBUM_API_KEY = process.env.ALBUM_API_KEY;
+
+// Utility function for HTTP requests
+function httpsGet(url, additionalHeaders = {}) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const isHttps = urlObj.protocol === "https:";
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (isHttps ? 443 : 80),
+      path: urlObj.pathname + urlObj.search,
+      method: "GET",
+      headers: {
+        "User-Agent": "Album-of-the-Day-Bot/1.0",
+        ...additionalHeaders,
+      },
+    };
+
+    // Add API key for Album of the Day feed requests
+    if (ALBUM_API_KEY && (url.includes("albumoftheday.netlify.app") || url.includes("localhost"))) {
+      options.headers["X-API-Key"] = ALBUM_API_KEY;
+    }
+
+    const requestModule = isHttps ? https : http;
+    const req = requestModule.request(options, (res) => {
+      let data = "";
+
+      res.on("data", (chunk) => {
+        data += chunk;
+      });
+
+      res.on("end", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            resolve(JSON.parse(data));
+          } catch (error) {
+            reject(new Error(`Failed to parse JSON: ${error.message}`));
+          }
+        } else {
+          reject(new Error(`HTTP ${res.statusCode}: ${data}`));
+        }
+      });
+    });
+
+    req.on("error", reject);
+    req.setTimeout(10000, () => {
+      req.destroy();
+      reject(new Error("Request timeout"));
+    });
+
+    req.end();
+  });
+}
+
+// Function to get direct Wikipedia URL using our centralized API
+async function getTopWikipediaUrl(album, artist) {
+  try {
+    const baseUrl = ALBUM_FEED_URL.includes('localhost') 
+      ? 'http://localhost:3000' 
+      : 'https://albumoftheday.netlify.app';
+    
+    const wikipediaUrl = `${baseUrl}/api/wikipedia?album=${encodeURIComponent(album)}&artist=${encodeURIComponent(artist)}`;
+    
+    const response = await httpsGet(wikipediaUrl);
+    
+    if (response && response.url) {
+      return response.url;
+    }
+    return null;
+  } catch (error) {
+    console.log(`⚠️  Wikipedia API error: ${error.message}`);
+    return null;
+  }
+}
 
 // Function to create authenticated Bluesky agent
 async function createBlueskyAgent() {
@@ -36,7 +114,7 @@ async function createBlueskyAgent() {
 }
 
 // Function to create smart Bluesky post that fits character limit
-function formatBlueskyPost(albumItem) {
+async function formatBlueskyPost(albumItem) {
   const album = albumItem._album;
   const today = new Date().toLocaleDateString('en-CA', {
     timeZone: 'America/Los_Angeles'
@@ -46,7 +124,7 @@ function formatBlueskyPost(albumItem) {
   // Base content
   const header = `🎧 ${isToday ? "Today's" : "Featured"} album:`;
   const albumInfo = `${album.album} by ${album.artist}${album.year ? ` (${album.year})` : ""}`;
-  const hashtags = `#AlbumOfTheDay #Music`;
+  const hashtags = `#AlbumOfTheDay`;
   
   // Build sections in priority order
   const sections = [];
@@ -54,44 +132,50 @@ function formatBlueskyPost(albumItem) {
   
   // Create clean streaming links with labels (using shortest possible URLs)
   const searchQuery = encodeURIComponent(`${album.artist} ${album.album}`);
-  const streamingLinks = [
-    `[Spotify](https://open.spotify.com/search/${searchQuery})`,
-    `[Apple](https://music.apple.com/search?term=${searchQuery})`, // Shorter label
-    `[YouTube](https://music.youtube.com/search?q=${searchQuery})` // Shorter label  
-  ];
   
-  // Try to fit streaming links (prioritize fitting as many as possible)
-  let postText = sections[0];
-  let availableSpace = 300 - postText.length - hashtags.length - 4; // 4 chars for spacing/newlines (\n\n between links and hashtags)
-  
-  // Try to fit all streaming links on one line with separators
-  const allLinksText = streamingLinks.join(' • ');
-  
-  
-  if (availableSpace >= allLinksText.length + 1) { // +1 for newline
-    postText += `\n${allLinksText}`;
-  } else {
-    // Fallback: fit as many as possible
-    const fittingLinks = [];
-    let remainingSpace = availableSpace - 1; // -1 for newline
-    
-    for (const link of streamingLinks) {
-      const separator = fittingLinks.length === 0 ? '' : ' • ';
-      const testLength = separator.length + link.length;
-      
-      if (remainingSpace >= testLength) {
-        fittingLinks.push(link);
-        remainingSpace -= testLength;
-      }
-    }
-    
-    if (fittingLinks.length > 0) {
-      postText += `\n${fittingLinks.join(' • ')}`;
-    }
+  // Get Wikipedia URL (try API first, fallback to search)
+  let wikipediaUrl = await getTopWikipediaUrl(album.album, album.artist);
+  if (!wikipediaUrl) {
+    const wikipediaQuery = encodeURIComponent(`${album.album} ${album.artist}`);
+    wikipediaUrl = `https://en.wikipedia.org/wiki/Special:Search/${wikipediaQuery}`;
   }
   
-  // Add hashtags
-  postText += `\n\n${hashtags}`;
+  // Define content in priority order (highest to lowest)
+  const baseContent = `${header}\n${albumInfo}`;
+  const links = [
+    `[Spotify](https://open.spotify.com/search/${searchQuery})`,
+    `[Apple](https://music.apple.com/search?term=${searchQuery})`,
+    `[YouTube](https://music.youtube.com/search?q=${searchQuery})`,
+    `[Wikipedia](${wikipediaUrl})`
+  ];
+  
+  // Try different combinations starting with everything, then remove lowest priority items
+  const attempts = [
+    // Full version with hashtag
+    { content: baseContent, links: links, hashtag: hashtags },
+    // Drop hashtag first
+    { content: baseContent, links: links, hashtag: '' },
+    // Drop Wikipedia next (lowest priority link)
+    { content: baseContent, links: links.slice(0, 3), hashtag: '' },
+    // Drop YouTube if still too long
+    { content: baseContent, links: links.slice(0, 2), hashtag: '' },
+    // Drop Apple if still too long
+    { content: baseContent, links: links.slice(0, 1), hashtag: '' },
+    // Just album info and Spotify as absolute minimum
+    { content: baseContent, links: [links[0]], hashtag: '' }
+  ];
+  
+  let postText = '';
+  for (const attempt of attempts) {
+    const linksText = attempt.links.length > 0 ? `\n${attempt.links.join(' • ')}` : '';
+    const hashtagText = attempt.hashtag ? `\n\n${attempt.hashtag}` : '';
+    const testText = `${attempt.content}${linksText}${hashtagText}`;
+    
+    if (testText.length <= 300) {
+      postText = testText;
+      break;
+    }
+  }
   
   // Final check - if still too long, truncate smartly
   if (postText.length > 300) {
@@ -120,7 +204,7 @@ async function postToBluesky(albumItem) {
     console.log('🦋 Preparing to post to Bluesky...');
     
     const agent = await createBlueskyAgent();
-    const postData = formatBlueskyPost(albumItem);
+    const postData = await formatBlueskyPost(albumItem);
     
     // The formatBlueskyPost function already handles character limits intelligently
     // but add a final safeguard with smart truncation
