@@ -81,14 +81,28 @@ async function runBlueskyTest() {
 
     if (ALBUM_API_KEY) {
       console.log(`✅ API Key provided: ${ALBUM_API_KEY.slice(0, 8)}...`);
+      console.log(`📡 Fetching album feed from: ${ALBUM_FEED_URL}`);
+      
+      // Fetch the JSON feed
+      var feed = await httpsGet(ALBUM_FEED_URL);
     } else {
-      console.log("❌ No API key provided - this may fail for external access");
+      console.log("❌ No API key provided - using mock data for testing format");
+      
+      // Create mock feed data for testing
+      var feed = {
+        items: [{
+          _album: {
+            album: "OK Computer",
+            artist: "Radiohead", 
+            year: 1997,
+            scheduledDate: new Date().toLocaleDateString('en-CA', {
+              timeZone: 'America/Los_Angeles'
+            })
+          },
+          image: "https://example.com/album-cover.jpg"
+        }]
+      };
     }
-
-    console.log(`📡 Fetching album feed from: ${ALBUM_FEED_URL}`);
-
-    // Fetch the JSON feed
-    const feed = await httpsGet(ALBUM_FEED_URL);
 
     if (!feed.items || feed.items.length === 0) {
       throw new Error("No albums found in feed");
@@ -142,6 +156,7 @@ async function runBlueskyTest() {
     console.log("\n🦋 Preview (as it would appear on Bluesky):");
     console.log("==========================================");
     console.log(blueskyPost.text);
+    
 
     if (blueskyPost.text.length > 300) {
       console.log("\n⚠️  WARNING: Post exceeds Bluesky's 300 character limit!");

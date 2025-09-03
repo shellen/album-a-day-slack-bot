@@ -35,7 +35,7 @@ async function createBlueskyAgent() {
   }
 }
 
-// Function to format album data for Bluesky post
+// Function to create smart Bluesky post that fits character limit
 function formatBlueskyPost(albumItem) {
   const album = albumItem._album;
   const today = new Date().toLocaleDateString('en-CA', {
@@ -43,18 +43,73 @@ function formatBlueskyPost(albumItem) {
   });
   const isToday = album.scheduledDate === today;
 
-  // Create post text with music emoji and streaming links
-  const albumText = `🎧 ${isToday ? "Today's" : "Featured"} album:
-${album.album} by ${album.artist}${album.year ? ` (${album.year})` : ""}
-
-🎵 Listen on Spotify: https://open.spotify.com/search/${encodeURIComponent(`${album.artist} ${album.album}`)}
-📱 Apple Music: https://music.apple.com/search?term=${encodeURIComponent(`${album.artist} ${album.album}`)}
-▶️ YouTube: https://www.youtube.com/results?search_query=${encodeURIComponent(`${album.artist} ${album.album}`)}
-
-#AlbumOfTheDay #Music`;
+  // Base content
+  const header = `🎧 ${isToday ? "Today's" : "Featured"} album:`;
+  const albumInfo = `${album.album} by ${album.artist}${album.year ? ` (${album.year})` : ""}`;
+  const hashtags = `#AlbumOfTheDay #Music`;
+  
+  // Build sections in priority order
+  const sections = [];
+  sections.push(`${header}\n${albumInfo}`);
+  
+  // Create clean streaming links with labels (using shortest possible URLs)
+  const searchQuery = encodeURIComponent(`${album.artist} ${album.album}`);
+  const streamingLinks = [
+    `[Spotify](https://open.spotify.com/search/${searchQuery})`,
+    `[Apple](https://music.apple.com/search?term=${searchQuery})`, // Shorter label
+    `[YouTube](https://music.youtube.com/search?q=${searchQuery})` // Shorter label  
+  ];
+  
+  // Try to fit streaming links (prioritize fitting as many as possible)
+  let postText = sections[0];
+  let availableSpace = 300 - postText.length - hashtags.length - 4; // 4 chars for spacing/newlines (\n\n between links and hashtags)
+  
+  // Try to fit all streaming links on one line with separators
+  const allLinksText = streamingLinks.join(' • ');
+  
+  
+  if (availableSpace >= allLinksText.length + 1) { // +1 for newline
+    postText += `\n${allLinksText}`;
+  } else {
+    // Fallback: fit as many as possible
+    const fittingLinks = [];
+    let remainingSpace = availableSpace - 1; // -1 for newline
+    
+    for (const link of streamingLinks) {
+      const separator = fittingLinks.length === 0 ? '' : ' • ';
+      const testLength = separator.length + link.length;
+      
+      if (remainingSpace >= testLength) {
+        fittingLinks.push(link);
+        remainingSpace -= testLength;
+      }
+    }
+    
+    if (fittingLinks.length > 0) {
+      postText += `\n${fittingLinks.join(' • ')}`;
+    }
+  }
+  
+  // Add hashtags
+  postText += `\n\n${hashtags}`;
+  
+  // Final check - if still too long, truncate smartly
+  if (postText.length > 300) {
+    // Remove streaming links and just keep essential info
+    postText = `${sections[0]}\n\n${hashtags}`;
+    
+    // If still too long, truncate album info smartly
+    if (postText.length > 300) {
+      const maxAlbumInfoLength = 300 - header.length - hashtags.length - 6; // spacing
+      if (albumInfo.length > maxAlbumInfoLength) {
+        const truncatedInfo = albumInfo.substring(0, maxAlbumInfoLength - 3) + '...';
+        postText = `${header}\n${truncatedInfo}\n\n${hashtags}`;
+      }
+    }
+  }
 
   return {
-    text: albumText,
+    text: postText,
     createdAt: new Date().toISOString()
   };
 }
@@ -67,10 +122,25 @@ async function postToBluesky(albumItem) {
     const agent = await createBlueskyAgent();
     const postData = formatBlueskyPost(albumItem);
     
-    // Ensure post is within Bluesky's 300 character limit
+    // The formatBlueskyPost function already handles character limits intelligently
+    // but add a final safeguard with smart truncation
     if (postData.text.length > 300) {
-      console.log(`⚠️  Post too long (${postData.text.length} chars), truncating...`);
-      postData.text = postData.text.substring(0, 297) + '...';
+      console.log(`⚠️  Post still too long (${postData.text.length} chars), applying emergency truncation...`);
+      
+      // Smart truncation: find the last complete word before limit
+      const maxLength = 297; // Leave room for '...'
+      let truncated = postData.text.substring(0, maxLength);
+      
+      // Find last space to avoid breaking words
+      const lastSpaceIndex = truncated.lastIndexOf(' ');
+      const lastNewlineIndex = truncated.lastIndexOf('\n');
+      const lastBreakIndex = Math.max(lastSpaceIndex, lastNewlineIndex);
+      
+      if (lastBreakIndex > maxLength * 0.8) { // Only if we don't lose too much content
+        truncated = postData.text.substring(0, lastBreakIndex);
+      }
+      
+      postData.text = truncated + '...';
     }
     
     console.log(`📝 Post content (${postData.text.length} chars):`);
