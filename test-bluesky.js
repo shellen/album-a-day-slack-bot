@@ -167,11 +167,19 @@ async function runBlueskyTest() {
       console.log(`\n✅ Post length is good (${blueskyPost.text.length} characters)`);
     }
 
+    // Show if image would be included
+    if (targetAlbum.image) {
+      console.log(`\n🖼️  Album artwork will be attached: ${targetAlbum.image}`);
+    } else {
+      console.log(`\n📷 No album artwork available for this post`);
+    }
+
     console.log("\n✅ Bluesky test completed successfully!");
     console.log(
       "💡 If this looks correct, your bot is ready to post to Bluesky."
     );
     console.log("💡 Set POST_TO_BLUESKY=true to enable Bluesky posting in production.");
+    console.log("💡 Album artwork will be automatically attached when available.");
   } catch (error) {
     console.error("\n❌ Test failed:", error.message);
 

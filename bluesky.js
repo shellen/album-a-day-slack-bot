@@ -113,6 +113,54 @@ async function createBlueskyAgent() {
   }
 }
 
+// Function to download image as buffer for Bluesky upload
+async function downloadImage(imageUrl) {
+  if (!imageUrl) return null;
+  
+  try {
+    const urlObj = new URL(imageUrl);
+    const isHttps = urlObj.protocol === "https:";
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (isHttps ? 443 : 80),
+      path: urlObj.pathname + urlObj.search,
+      method: "GET",
+      headers: {
+        "User-Agent": "Album-of-the-Day-Bot/1.0",
+      },
+    };
+
+    const requestModule = isHttps ? https : http;
+    
+    return new Promise((resolve, reject) => {
+      const req = requestModule.request(options, (res) => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          const chunks = [];
+          res.on("data", (chunk) => chunks.push(chunk));
+          res.on("end", () => {
+            const buffer = Buffer.concat(chunks);
+            const mimeType = res.headers['content-type'] || 'image/jpeg';
+            resolve({ buffer, mimeType });
+          });
+        } else {
+          reject(new Error(`HTTP ${res.statusCode}`));
+        }
+      });
+
+      req.on("error", reject);
+      req.setTimeout(10000, () => {
+        req.destroy();
+        reject(new Error("Request timeout"));
+      });
+      
+      req.end();
+    });
+  } catch (error) {
+    console.log(`⚠️  Error downloading image: ${error.message}`);
+    return null;
+  }
+}
+
 // Function to create smart Bluesky post that fits character limit
 async function formatBlueskyPost(albumItem) {
   const album = albumItem._album;
@@ -198,7 +246,7 @@ async function formatBlueskyPost(albumItem) {
   };
 }
 
-// Function to post to Bluesky
+// Function to post to Bluesky with image
 async function postToBluesky(albumItem) {
   try {
     console.log('🦋 Preparing to post to Bluesky...');
@@ -230,10 +278,50 @@ async function postToBluesky(albumItem) {
     console.log(`📝 Post content (${postData.text.length} chars):`);
     console.log(postData.text);
     
-    const response = await agent.post(postData);
+    // Try to add album artwork
+    let embed = null;
+    if (albumItem.image) {
+      try {
+        console.log('🖼️  Downloading album artwork...');
+        const imageData = await downloadImage(albumItem.image);
+        
+        if (imageData) {
+          console.log(`📤 Uploading album artwork (${imageData.mimeType})...`);
+          const uploadResult = await agent.uploadBlob(imageData.buffer, {
+            encoding: imageData.mimeType
+          });
+          
+          const album = albumItem._album;
+          embed = {
+            $type: 'app.bsky.embed.images',
+            images: [{
+              alt: `${album.album} by ${album.artist} album cover`,
+              image: uploadResult.data.blob
+            }]
+          };
+          
+          console.log('✅ Album artwork uploaded successfully');
+        }
+      } catch (imageError) {
+        console.log(`⚠️  Failed to add album artwork: ${imageError.message}`);
+        // Continue without image - don't fail the entire post
+      }
+    }
+    
+    // Create final post with optional image embed
+    const finalPost = {
+      text: postData.text,
+      createdAt: postData.createdAt,
+      ...(embed && { embed })
+    };
+    
+    const response = await agent.post(finalPost);
     
     if (response && response.uri) {
       console.log('✅ Successfully posted to Bluesky!');
+      if (embed) {
+        console.log('🖼️  Post includes album artwork');
+      }
       console.log(`🔗 Post URI: ${response.uri}`);
       return response;
     } else {
