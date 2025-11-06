@@ -443,6 +443,40 @@ async function main() {
       const slackMessage = await formatAlbumMessage(targetAlbum);
 
       console.log(`📤 Posting to Slack channel: ${SLACK_CHANNEL}`);
+
+      // Log payload to stderr to avoid buffering issues in CI
+      try {
+        const payloadJson = JSON.stringify(slackMessage, null, 2);
+        console.error('🔍 Slack message payload:');
+        console.error(payloadJson);
+
+        // Validate payload structure
+        if (!slackMessage.blocks || !Array.isArray(slackMessage.blocks)) {
+          throw new Error('Invalid payload: blocks is not an array');
+        }
+
+        // Validate each block has required fields
+        slackMessage.blocks.forEach((block, index) => {
+          if (!block.type) {
+            throw new Error(`Block ${index} missing type field`);
+          }
+          if (block.type === 'section' && (!block.text || !block.text.text)) {
+            throw new Error(`Section block ${index} has empty text`);
+          }
+          if (block.type === 'image' && (!block.image_url || !block.alt_text)) {
+            throw new Error(`Image block ${index} missing image_url or alt_text`);
+          }
+          if (block.type === 'actions' && (!block.elements || block.elements.length === 0)) {
+            throw new Error(`Actions block ${index} has no elements`);
+          }
+        });
+
+        console.log('✅ Payload validation passed');
+      } catch (jsonError) {
+        console.error('❌ Failed to serialize or validate payload:', jsonError.message);
+        throw jsonError;
+      }
+
       await postToSlack(SLACK_WEBHOOK_URL, slackMessage);
 
       console.log("✅ Successfully posted album to Slack!");
