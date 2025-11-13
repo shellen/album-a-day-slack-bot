@@ -22,8 +22,29 @@ const ALBUM_API_KEY = process.env.ALBUM_API_KEY; // Required for external access
 const TARGET_DATE = process.env.TARGET_DATE; // Optional: specific date to fetch
 const POST_TO_BLUESKY = process.env.POST_TO_BLUESKY === 'true'; // Optional: enable Bluesky posting
 
-// Utility function to make HTTP/HTTPS requests
-function httpsGet(url, additionalHeaders = {}) {
+// Utility function to make HTTP/HTTPS requests with retry logic
+async function httpsGet(url, additionalHeaders = {}, retries = 3, delay = 2000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const result = await httpsGetAttempt(url, additionalHeaders, attempt);
+      return result;
+    } catch (error) {
+      const isLastAttempt = attempt === retries;
+      const is500Error = error.message.includes('HTTP 500') || error.message.includes('HTTP 502') || error.message.includes('HTTP 503');
+
+      if (is500Error && !isLastAttempt) {
+        console.log(`⚠️  API returned ${error.message.match(/HTTP \d+/)?.[0]} (attempt ${attempt}/${retries}), retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
+// Helper function for a single HTTP GET attempt
+function httpsGetAttempt(url, additionalHeaders = {}, attemptNumber = 1) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const isHttps = urlObj.protocol === "https:";
@@ -44,6 +65,13 @@ function httpsGet(url, additionalHeaders = {}) {
       (url.includes("albumoftheday.netlify.app") || url.includes("localhost"))
     ) {
       options.headers["X-API-Key"] = ALBUM_API_KEY;
+      if (attemptNumber === 1) {
+        console.log(`🔑 Using API key: ${ALBUM_API_KEY.substring(0, 8)}...${ALBUM_API_KEY.substring(ALBUM_API_KEY.length - 4)}`);
+      }
+    }
+
+    if (attemptNumber === 1) {
+      console.log(`🌐 GET ${url}`);
     }
 
     const requestModule = isHttps ? https : http;
@@ -57,17 +85,28 @@ function httpsGet(url, additionalHeaders = {}) {
       res.on("end", () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           try {
-            resolve(JSON.parse(data));
+            const parsed = JSON.parse(data);
+            if (attemptNumber === 1) {
+              console.log(`✅ API returned ${res.statusCode} OK`);
+            }
+            resolve(parsed);
           } catch (error) {
+            console.error(`❌ Failed to parse JSON response: ${error.message}`);
+            console.error(`📋 Response data: ${data.substring(0, 500)}`);
             reject(new Error(`Failed to parse JSON: ${error.message}`));
           }
         } else {
+          console.error(`❌ API error - Status: ${res.statusCode}, Response: ${data}`);
           reject(new Error(`HTTP ${res.statusCode}: ${data}`));
         }
       });
     });
 
-    req.on("error", reject);
+    req.on("error", (error) => {
+      console.error(`❌ Network error: ${error.message}`);
+      reject(error);
+    });
+
     req.setTimeout(10000, () => {
       req.destroy();
       reject(new Error("Request timeout"));

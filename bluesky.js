@@ -17,8 +17,29 @@ const BLUESKY_PASSWORD = process.env.BLUESKY_PASSWORD; // App Password
 const ALBUM_FEED_URL = process.env.ALBUM_FEED_URL || "https://albumoftheday.netlify.app/api/feed/json";
 const ALBUM_API_KEY = process.env.ALBUM_API_KEY;
 
-// Utility function for HTTP requests
-function httpsGet(url, additionalHeaders = {}) {
+// Utility function for HTTP requests with retry logic
+async function httpsGet(url, additionalHeaders = {}, retries = 3, delay = 2000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const result = await httpsGetAttempt(url, additionalHeaders, attempt);
+      return result;
+    } catch (error) {
+      const isLastAttempt = attempt === retries;
+      const is500Error = error.message.includes('HTTP 500') || error.message.includes('HTTP 502') || error.message.includes('HTTP 503');
+
+      if (is500Error && !isLastAttempt) {
+        console.log(`⚠️  API returned ${error.message.match(/HTTP \d+/)?.[0]} (attempt ${attempt}/${retries}), retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
+// Helper function for a single HTTP GET attempt
+function httpsGetAttempt(url, additionalHeaders = {}, attemptNumber = 1) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const isHttps = urlObj.protocol === "https:";
@@ -49,11 +70,14 @@ function httpsGet(url, additionalHeaders = {}) {
       res.on("end", () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           try {
-            resolve(JSON.parse(data));
+            const parsed = JSON.parse(data);
+            resolve(parsed);
           } catch (error) {
+            console.error(`❌ Failed to parse JSON response: ${error.message}`);
             reject(new Error(`Failed to parse JSON: ${error.message}`));
           }
         } else {
+          console.error(`❌ API error - Status: ${res.statusCode}, Response: ${data}`);
           reject(new Error(`HTTP ${res.statusCode}: ${data}`));
         }
       });
