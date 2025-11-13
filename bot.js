@@ -77,11 +77,33 @@ function httpsGet(url, additionalHeaders = {}) {
   });
 }
 
-// Function to post message to Slack
-function postToSlack(webhookUrl, message) {
+// Function to post message to Slack with retry logic
+async function postToSlack(webhookUrl, message, retries = 3, delay = 2000) {
+  const postData = JSON.stringify(message);
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const result = await postToSlackAttempt(webhookUrl, postData, attempt);
+      return result;
+    } catch (error) {
+      const isLastAttempt = attempt === retries;
+      const is500Error = error.message.includes('Slack API error 500');
+
+      if (is500Error && !isLastAttempt) {
+        console.log(`⚠️  Slack returned 500 error (attempt ${attempt}/${retries}), retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
+// Helper function for a single Slack post attempt
+function postToSlackAttempt(webhookUrl, postData, attemptNumber) {
   return new Promise((resolve, reject) => {
     const url = new URL(webhookUrl);
-    const postData = JSON.stringify(message);
 
     const options = {
       hostname: url.hostname,
@@ -95,6 +117,10 @@ function postToSlack(webhookUrl, message) {
       },
     };
 
+    if (attemptNumber === 1) {
+      console.log(`📡 Posting to Slack webhook (payload size: ${Buffer.byteLength(postData)} bytes)`);
+    }
+
     const req = https.request(options, (res) => {
       let data = "";
 
@@ -104,14 +130,21 @@ function postToSlack(webhookUrl, message) {
 
       res.on("end", () => {
         if (res.statusCode === 200) {
+          console.log(`✅ Slack webhook returned 200 OK${data ? `: ${data}` : ''}`);
           resolve(data);
         } else {
+          console.error(`❌ Slack webhook error - Status: ${res.statusCode}, Response: ${data}`);
+          console.error(`📋 Request payload was: ${postData.substring(0, 500)}...`);
           reject(new Error(`Slack API error ${res.statusCode}: ${data}`));
         }
       });
     });
 
-    req.on("error", reject);
+    req.on("error", (error) => {
+      console.error(`❌ Network error posting to Slack: ${error.message}`);
+      reject(error);
+    });
+
     req.setTimeout(10000, () => {
       req.destroy();
       reject(new Error("Slack request timeout"));
@@ -244,6 +277,7 @@ async function formatAlbumMessage(albumItem) {
   // Spotify
   buttons.push({
     type: "button",
+    action_id: "spotify_button",
     text: {
       type: "plain_text",
       text: "🎵 Spotify",
@@ -255,6 +289,7 @@ async function formatAlbumMessage(albumItem) {
   // Apple Music
   buttons.push({
     type: "button",
+    action_id: "apple_music_button",
     text: {
       type: "plain_text",
       text: "📱 Apple Music",
@@ -266,6 +301,7 @@ async function formatAlbumMessage(albumItem) {
   // YouTube
   buttons.push({
     type: "button",
+    action_id: "youtube_button",
     text: {
       type: "plain_text",
       text: "▶️ YouTube",
@@ -276,7 +312,7 @@ async function formatAlbumMessage(albumItem) {
 
   // Add Wikipedia button using our centralized API
   let wikipediaUrl = await getTopWikipediaUrl(album.album, album.artist);
-  
+
   if (!wikipediaUrl) {
     const fallbackQuery = encodeURIComponent(
       `${album.album} ${album.artist} album`
@@ -289,6 +325,7 @@ async function formatAlbumMessage(albumItem) {
 
   buttons.push({
     type: "button",
+    action_id: "wikipedia_button",
     text: {
       type: "plain_text",
       text: "📖 Wikipedia",
