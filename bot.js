@@ -77,6 +77,26 @@ function httpsGet(url, additionalHeaders = {}) {
   });
 }
 
+// Retry wrapper for httpsGet with exponential backoff
+async function httpsGetWithRetry(url, retries = 3, delay = 2000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await httpsGet(url);
+    } catch (error) {
+      const isLastAttempt = attempt === retries;
+      const isServerError = error.message.includes('HTTP 5');
+
+      if (isServerError && !isLastAttempt) {
+        console.log(`⚠️  Feed returned server error (attempt ${attempt}/${retries}), retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
 // Function to post message to Slack with retry logic
 async function postToSlack(webhookUrl, message, retries = 3, delay = 2000) {
   const postData = JSON.stringify(message);
@@ -426,8 +446,8 @@ async function main() {
 
     console.log(`📡 Fetching album feed from: ${ALBUM_FEED_URL}`);
 
-    // Fetch the JSON feed
-    const feed = await httpsGet(ALBUM_FEED_URL);
+    // Fetch the JSON feed with retry logic for transient server errors
+    const feed = await httpsGetWithRetry(ALBUM_FEED_URL);
 
     if (!feed.items || feed.items.length === 0) {
       throw new Error("No albums found in feed");
@@ -567,4 +587,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, formatAlbumMessage, getPacificDateString, getTopWikipediaUrl };
+module.exports = { main, formatAlbumMessage, getPacificDateString, getTopWikipediaUrl, httpsGetWithRetry };
