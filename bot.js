@@ -23,7 +23,7 @@ const TARGET_DATE = process.env.TARGET_DATE; // Optional: specific date to fetch
 const POST_TO_BLUESKY = process.env.POST_TO_BLUESKY === 'true'; // Optional: enable Bluesky posting
 
 // Utility function to make HTTP/HTTPS requests
-function httpsGet(url, additionalHeaders = {}) {
+function httpsGet(url, additionalHeaders = {}, { skipApiKey = false } = {}) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const isHttps = urlObj.protocol === "https:";
@@ -40,6 +40,7 @@ function httpsGet(url, additionalHeaders = {}) {
 
     // Add API key for Album of the Day feed requests
     if (
+      !skipApiKey &&
       ALBUM_API_KEY &&
       (url.includes("albumoftheday.netlify.app") || url.includes("localhost"))
     ) {
@@ -79,15 +80,18 @@ function httpsGet(url, additionalHeaders = {}) {
 
 // Retry wrapper for httpsGet with exponential backoff
 async function httpsGetWithRetry(url, retries = 3, delay = 2000) {
+  let lastError;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       return await httpsGet(url);
     } catch (error) {
+      lastError = error;
       const isLastAttempt = attempt === retries;
       const isServerError = error.message.includes('HTTP 5');
 
       if (isServerError && !isLastAttempt) {
         console.log(`⚠️  Feed returned server error (attempt ${attempt}/${retries}), retrying in ${delay}ms...`);
+        console.log(`   ↳ Error detail: ${error.message.substring(0, 200)}`);
         await new Promise(resolve => setTimeout(resolve, delay));
         delay *= 2; // Exponential backoff
       } else {
@@ -446,8 +450,62 @@ async function main() {
 
     console.log(`📡 Fetching album feed from: ${ALBUM_FEED_URL}`);
 
-    // Fetch the JSON feed with retry logic for transient server errors
-    const feed = await httpsGetWithRetry(ALBUM_FEED_URL);
+    // Fetch the JSON feed with retry logic and fallback strategies
+    let feed;
+    try {
+      feed = await httpsGetWithRetry(ALBUM_FEED_URL);
+    } catch (primaryError) {
+      const isServerError = primaryError.message.includes('HTTP 5');
+      if (isServerError) {
+        console.log(`⚠️  Primary feed failed with server error: ${primaryError.message}`);
+
+        // Fallback 1: Try without API key (in case key triggers server bug)
+        try {
+          console.log('🔄 Fallback: trying feed without API key...');
+          feed = await httpsGet(ALBUM_FEED_URL, {}, { skipApiKey: true });
+          console.log('✅ Fallback succeeded (feed without API key)');
+        } catch (noKeyError) {
+          console.log(`   ↳ Failed: ${noKeyError.message}`);
+        }
+
+        // Fallback 2: Try static feed path
+        if (!feed) {
+          const staticFeedUrl = ALBUM_FEED_URL.replace('/api/feed/json', '/feed.json');
+          if (staticFeedUrl !== ALBUM_FEED_URL) {
+            try {
+              console.log(`🔄 Fallback: trying static feed at ${staticFeedUrl}`);
+              feed = await httpsGet(staticFeedUrl);
+              console.log('✅ Fallback succeeded (static feed)');
+            } catch (staticError) {
+              console.log(`   ↳ Failed: ${staticError.message}`);
+            }
+          }
+        }
+
+        // Fallback 3: Try feed at site root with API key in query param
+        if (!feed) {
+          try {
+            const qsUrl = ALBUM_FEED_URL + (ALBUM_FEED_URL.includes('?') ? '&' : '?') + `key=${ALBUM_API_KEY}`;
+            console.log('🔄 Fallback: trying feed with key as query parameter...');
+            feed = await httpsGet(qsUrl, {}, { skipApiKey: true });
+            console.log('✅ Fallback succeeded (key as query param)');
+          } catch (qsError) {
+            console.log(`   ↳ Failed: ${qsError.message}`);
+          }
+        }
+
+        if (!feed) {
+          throw new Error(
+            `Feed server error after all fallback attempts. ` +
+            `Primary error: ${primaryError.message}. ` +
+            `The feed at ${ALBUM_FEED_URL} may be experiencing an outage. ` +
+            `Check https://albumoftheday.netlify.app for status.`
+          );
+        }
+      } else {
+        throw primaryError;
+      }
+    }
 
     if (!feed.items || feed.items.length === 0) {
       throw new Error("No albums found in feed");
